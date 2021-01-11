@@ -114,6 +114,7 @@ contract DaiJoin is LibNote {
     VatLike public vat;      // CDP Engine
     DSTokenLike public dai;  // Stablecoin Token
     uint    public live;     // Active Flag
+    address public wallet;
 
     constructor(address vat_, address dai_) public {
         wards[msg.sender] = 1;
@@ -121,6 +122,11 @@ contract DaiJoin is LibNote {
         vat = VatLike(vat_);
         dai = DSTokenLike(dai_);
     }
+
+    function purse(address wallet_) external note auth {
+        wallet = wallet_;
+    }
+
     function cage() external note auth {
         live = 0;
     }
@@ -130,11 +136,22 @@ contract DaiJoin is LibNote {
     }
     function join(address usr, uint wad) external note {
         vat.move(address(this), usr, mul(ONE, wad));
-        dai.burn(msg.sender, wad);
+
+        if (address(0x0) == wallet) {
+            dai.burn(msg.sender, wad);    
+        } else {
+            require(GemLike(address(dai)).transferFrom(msg.sender, wallet, wad), "DaiJoin/join/failed-transfer");
+        }        
     }
+
     function exit(address usr, uint wad) external note {
         require(live == 1, "DaiJoin/not-live");
         vat.move(msg.sender, address(this), mul(ONE, wad));
-        dai.mint(usr, wad);
+        
+        if (address(0x0) == wallet) {
+            dai.mint(usr, wad);
+        } else {
+            require(GemLike(address(dai)).transferFrom(wallet, usr, wad), "DaiJoin/exit/failed-transfer");
+        }         
     }
 }
